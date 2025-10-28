@@ -8,11 +8,11 @@ import (
 
 // Domain errors returned by core operations.
 var (
-        ErrBrandNotFound       = errors.New("brand not found")
-        ErrBrandInUse          = errors.New("brand is referenced by purchases or consumptions")
-        ErrPurchaseNotFound    = errors.New("purchase not found")
-        ErrConsumptionNotFound = errors.New("consumption not found")
-        ErrInsufficientInventory = errors.New("insufficient inventory for consumption")
+	ErrBrandNotFound         = errors.New("brand not found")
+	ErrBrandInUse            = errors.New("brand is referenced by purchases or consumptions")
+	ErrPurchaseNotFound      = errors.New("purchase not found")
+	ErrConsumptionNotFound   = errors.New("consumption not found")
+	ErrInsufficientInventory = errors.New("insufficient inventory for consumption")
 )
 
 // ValidationError describes an invalid field with an associated message.
