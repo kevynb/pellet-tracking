@@ -1,0 +1,71 @@
+{{define "consumptions"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<section>
+  <h2>Consommations</h2>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Marque</th>
+          <th>Sacs</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{if .Data.Consumptions}}
+        {{range .Data.Consumptions}}
+        <tr>
+          <td>{{formatDate .ConsumedAt}}</td>
+          <td>{{.BrandName}}</td>
+          <td>{{.Bags}}</td>
+          <td>{{.Notes}}</td>
+        </tr>
+        {{end}}
+        {{else}}
+        <tr>
+          <td colspan="4">Aucune consommation enregistrée.</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section style="margin-top: 2rem;">
+  <details open>
+    <summary>+ Enregistrer une consommation</summary>
+    <form method="post">
+      <fieldset>
+        <legend>Nouvelle consommation</legend>
+        <div class="grid grid-cols-2">
+          <label>
+            Marque
+            <select name="brand_id" required>
+              <option value="">Sélectionner…</option>
+              {{range .Data.Brands}}
+              <option value="{{.ID}}">{{.Name}}</option>
+              {{end}}
+            </select>
+          </label>
+          <label>
+            Date de consommation
+            <input type="date" name="consumed_at" data-default-today="true" required>
+          </label>
+          <label>
+            Nombre de sacs
+            <input type="number" name="bags" min="1" step="1" required>
+          </label>
+          <label>
+            Notes
+            <textarea name="notes" placeholder="Commentaires"></textarea>
+          </label>
+        </div>
+        <button type="submit">Ajouter la consommation</button>
+      </fieldset>
+    </form>
+  </details>
+</section>
+{{end}}

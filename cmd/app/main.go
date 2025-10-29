@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"pellets-tracker/internal/config"
 	httpserver "pellets-tracker/internal/http"
 	"pellets-tracker/internal/store"
+	tsnetserver "pellets-tracker/internal/tsnet"
 )
 
 func main() {
@@ -38,12 +40,24 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	listener, cleanup, listenAddr, err := prepareListener(cfg)
+	if err != nil {
+		log.Fatalf("failed to prepare listener: %v", err)
+	}
+	defer func() {
+		if cleanup != nil {
+			if err := cleanup(); err != nil && !errors.Is(err, net.ErrClosed) {
+				log.Printf("listener cleanup error: %v", err)
+			}
+		}
+	}()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("pellets tracker listening on %s (tsnet=%v)", cfg.ListenAddr, cfg.TsnetEnabled)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Printf("pellets tracker listening on %s (tsnet=%v)", listenAddr, cfg.TsnetEnabled)
+		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("http server error: %v", err)
 		}
 	}()
@@ -59,4 +73,30 @@ func main() {
 	}
 
 	log.Println("server stopped cleanly")
+}
+
+func prepareListener(cfg *config.Config) (net.Listener, func() error, string, error) {
+	if !cfg.TsnetEnabled {
+		ln, err := net.Listen("tcp", cfg.ListenAddr)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return ln, ln.Close, cfg.ListenAddr, nil
+	}
+
+	tsServer, err := tsnetserver.New(tsnetserver.Config{
+		Hostname: cfg.TsnetHostname,
+		Dir:      cfg.TsnetDir,
+		AuthKey:  cfg.TsnetAuthKey,
+		Listen:   cfg.TsnetListenAddr,
+	})
+	if err != nil {
+		return nil, nil, "", err
+	}
+	ln, err := tsServer.Listen()
+	if err != nil {
+		tsServer.Close()
+		return nil, nil, "", err
+	}
+	return ln, tsServer.Close, cfg.TsnetListenAddr, nil
 }

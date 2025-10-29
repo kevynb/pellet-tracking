@@ -1,0 +1,98 @@
+{{define "stats"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<section>
+  <h2>Statistiques</h2>
+  <div class="card-grid">
+    <article class="inventory-card">
+      <h3>Total investi</h3>
+      <p style="font-size: 1.6rem;">{{formatMoney .Data.Invested}}</p>
+      <p class="meta">Achats sur la période sélectionnée</p>
+    </article>
+    <article class="inventory-card">
+      <h3>Coût consommé (FIFO)</h3>
+      <p style="font-size: 1.6rem;">{{formatMoney .Data.Consumed}}</p>
+      <p class="meta">Valorisation FIFO des consommations</p>
+    </article>
+    <article class="inventory-card">
+      <h3>Coût moyen par sac</h3>
+      <p style="font-size: 1.6rem;">{{formatMoney .Data.Average}}</p>
+      <p class="meta">Basé sur la consommation FIFO</p>
+    </article>
+    <article class="inventory-card">
+      <h3>Inventaire restant</h3>
+      <p class="meta">
+        {{.Data.Inventory.TotalBags}} sacs · {{formatWeight .Data.Inventory.TotalWeightKg}} kg · {{formatMoney .Data.Inventory.TotalCost}}
+      </p>
+    </article>
+  </div>
+</section>
+<section style="margin-top: 2rem;">
+  <h3>Consommation mensuelle</h3>
+  {{if .Data.Monthly}}
+  <div class="chart-bar">
+    {{range .Data.Monthly}}
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+      <div class="bar" style="height: {{.HeightPercent}}%;"><span>{{.Bags}}</span></div>
+      <div class="label">{{.Label}}</div>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <p>Aucune consommation sur la période.</p>
+  {{end}}
+</section>
+<section style="margin-top: 2rem;">
+  <h3>Inventaire détaillé</h3>
+  <div class="inventory-list">
+    {{if .Data.Inventory.Brands}}
+    {{range .Data.Inventory.Brands}}
+    <article class="inventory-card">
+      <h3>{{.BrandName}}</h3>
+      <p class="meta">{{.Bags}} sacs · {{formatWeight .WeightKg}} kg · {{formatMoney .TotalCost}}</p>
+    </article>
+    {{end}}
+    {{else}}
+    <p>Inventaire vide, toutes les consommations ont été valorisées.</p>
+    {{end}}
+  </div>
+</section>
+<section style="margin-top: 2rem;">
+  <h3>Détails FIFO</h3>
+  {{if .Data.Details}}
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Consommation</th>
+          <th>Allocations</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Data.Details}}
+        <tr>
+          <td>
+            <strong>{{formatDate .Consumption.ConsumedAt}}</strong><br>
+            {{.Consumption.Bags}} sacs · {{.BrandName}}
+          </td>
+          <td>
+            <ul>
+              {{range .Allocations}}
+              <li>{{.Bags}} sacs @ {{formatMoney .UnitPrice}} (achat {{.PurchaseID}})</li>
+              {{end}}
+            </ul>
+          </td>
+          <td>{{formatMoney .TotalPrice}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p>Aucune consommation valorisée.</p>
+  {{end}}
+</section>
+{{end}}

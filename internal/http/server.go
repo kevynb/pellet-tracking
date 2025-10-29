@@ -5,6 +5,8 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -19,8 +21,9 @@ import (
 
 // Server exposes the HTTP API for the pellets tracker application.
 type Server struct {
-	store *store.JSONStore
-	mux   *http.ServeMux
+	store     *store.JSONStore
+	mux       *http.ServeMux
+	templates map[string]*template.Template
 }
 
 // NewServer constructs a Server backed by the provided datastore.
@@ -28,7 +31,7 @@ func NewServer(store *store.JSONStore) *Server {
 	if store == nil {
 		panic("nil JSONStore")
 	}
-	s := &Server{store: store, mux: http.NewServeMux()}
+	s := &Server{store: store, mux: http.NewServeMux(), templates: newTemplateSet()}
 	s.registerRoutes()
 	return s
 }
@@ -40,13 +43,42 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/healthz", s.handleHealthz)
-	s.mux.HandleFunc("/api/marques", s.handleBrands)
-	s.mux.HandleFunc("/api/achats", s.handlePurchases)
-	s.mux.HandleFunc("/api/achats/", s.handlePurchaseByID)
-	s.mux.HandleFunc("/api/consommations", s.handleConsumptions)
-	s.mux.HandleFunc("/api/consommations/", s.handleConsumptionByID)
-	s.mux.HandleFunc("/api/stats", s.handleStats)
+	s.mux.Handle("/static/", http.StripPrefix("/static/", staticFileServer()))
+	s.mux.HandleFunc("/", s.handleHome)
+	s.mux.HandleFunc("/marques", s.handleBrandsPage)
+	s.mux.HandleFunc("/consommations", s.handleConsumptionsPage)
+	s.mux.HandleFunc("/stats", s.handleStatsPage)
+
+	s.mux.HandleFunc("/api/marques", s.handleBrandsAPI)
+	s.mux.HandleFunc("/api/achats", s.handlePurchasesAPI)
+	s.mux.HandleFunc("/api/achats/", s.handlePurchaseByIDAPI)
+	s.mux.HandleFunc("/api/consommations", s.handleConsumptionsAPI)
+	s.mux.HandleFunc("/api/consommations/", s.handleConsumptionByIDAPI)
+	s.mux.HandleFunc("/api/stats", s.handleStatsAPI)
 	s.mux.HandleFunc("/api/export/", s.handleExport)
+}
+
+func (s *Server) renderPage(w http.ResponseWriter, templateName, title, active string, data any, flash *flashMessage) {
+	if s.templates == nil {
+		http.Error(w, "templates not initialized", http.StatusInternalServerError)
+		return
+	}
+	tmpl, ok := s.templates[templateName]
+	if !ok {
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+	payload := pageData{
+		Title:     title,
+		ActiveNav: active,
+		Flash:     flash,
+		Data:      data,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tmpl.ExecuteTemplate(w, templateName, payload); err != nil {
+		log.Printf("render template %s: %v", templateName, err)
+		http.Error(w, "template rendering error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +91,220 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, `{"status":"ok"}`)
 }
 
-func (s *Server) handleBrands(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.renderHomePage(w, s.successFlash(r, "purchase", "Achat enregistré avec succès"))
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Formulaire invalide"})
+			return
+		}
+		ds := s.store.Data()
+		purchasedAt, err := parseDateOnly(r.FormValue("purchased_at"))
+		if err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Date d'achat invalide"})
+			return
+		}
+		bags, err := parseIntField(r.FormValue("bags"))
+		if err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Nombre de sacs invalide"})
+			return
+		}
+		weightKg, err := parseFloatField(r.FormValue("weight_kg"))
+		if err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Poids invalide"})
+			return
+		}
+		unitPrice, err := parseMoneyField(r.FormValue("unit_price_eur"))
+		if err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: err.Error()})
+			return
+		}
+
+		purchase, err := core.AddPurchase(&ds, core.CreatePurchaseParams{
+			BrandID:     core.ID(strings.TrimSpace(r.FormValue("brand_id"))),
+			PurchasedAt: purchasedAt,
+			Bags:        bags,
+			WeightKg:    weightKg,
+			UnitPrice:   unitPrice,
+			Notes:       strings.TrimSpace(r.FormValue("notes")),
+		})
+		if err != nil {
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+			return
+		}
+		if err := s.store.Replace(ds); err != nil {
+			log.Printf("persist purchase form: %v", err)
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Impossible d'enregistrer l'achat"})
+			return
+		}
+		log.Printf(`{"type":"save","entity":"purchase","id":"%s"}`, purchase.ID)
+		http.Redirect(w, r, "/?added=purchase", http.StatusSeeOther)
+	default:
+		s.methodNotAllowed(w, http.MethodGet, http.MethodPost)
+	}
+}
+
+func (s *Server) handleBrandsPage(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.renderBrandsPage(w, s.successFlash(r, "brand", "Marque enregistrée"))
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: "Formulaire invalide"})
+			return
+		}
+		ds := s.store.Data()
+		brand, err := core.AddBrand(&ds, core.CreateBrandParams{
+			Name:        r.FormValue("name"),
+			Description: r.FormValue("description"),
+			ImageBase64: strings.TrimSpace(r.FormValue("image_base64")),
+		})
+		if err != nil {
+			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+			return
+		}
+		if err := s.store.Replace(ds); err != nil {
+			log.Printf("persist brand form: %v", err)
+			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: "Impossible d'enregistrer la marque"})
+			return
+		}
+		log.Printf(`{"type":"save","entity":"brand","id":"%s"}`, brand.ID)
+		http.Redirect(w, r, "/marques?added=brand", http.StatusSeeOther)
+	default:
+		s.methodNotAllowed(w, http.MethodGet, http.MethodPost)
+	}
+}
+
+func (s *Server) handleConsumptionsPage(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.renderConsumptionsPage(w, s.successFlash(r, "consumption", "Consommation enregistrée"))
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			s.renderConsumptionsPage(w, &flashMessage{Kind: "error", Message: "Formulaire invalide"})
+			return
+		}
+		ds := s.store.Data()
+		consumedAt, err := parseDateOnly(r.FormValue("consumed_at"))
+		if err != nil {
+			s.renderConsumptionsPage(w, &flashMessage{Kind: "error", Message: "Date invalide"})
+			return
+		}
+		bags, err := parseIntField(r.FormValue("bags"))
+		if err != nil {
+			s.renderConsumptionsPage(w, &flashMessage{Kind: "error", Message: "Nombre de sacs invalide"})
+			return
+		}
+		consumption, err := core.AddConsumption(&ds, core.CreateConsumptionParams{
+			BrandID:    core.ID(strings.TrimSpace(r.FormValue("brand_id"))),
+			ConsumedAt: consumedAt,
+			Bags:       bags,
+			Notes:      strings.TrimSpace(r.FormValue("notes")),
+		})
+		if err != nil {
+			s.renderConsumptionsPage(w, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+			return
+		}
+		if err := s.store.Replace(ds); err != nil {
+			log.Printf("persist consumption form: %v", err)
+			s.renderConsumptionsPage(w, &flashMessage{Kind: "error", Message: "Impossible d'enregistrer la consommation"})
+			return
+		}
+		log.Printf(`{"type":"save","entity":"consumption","id":"%s"}`, consumption.ID)
+		http.Redirect(w, r, "/consommations?added=consumption", http.StatusSeeOther)
+	default:
+		s.methodNotAllowed(w, http.MethodGet, http.MethodPost)
+	}
+}
+
+func (s *Server) handleStatsPage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	ds := s.store.Data()
+	from, to, err := parseRangeQuery(r)
+	if err != nil {
+		s.renderPage(w, "stats", "Statistiques", "stats", statsView{}, &flashMessage{Kind: "error", Message: err.Error()})
+		return
+	}
+	invested := core.ComputeInvesti(&ds, from, to)
+	consumed, details, err := core.ComputeConsoValue(&ds, from, to)
+	if err != nil {
+		s.renderPage(w, "stats", "Statistiques", "stats", statsView{}, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+		return
+	}
+	inventory, err := core.ComputeInventaire(&ds)
+	if err != nil {
+		s.renderPage(w, "stats", "Statistiques", "stats", statsView{}, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+		return
+	}
+	monthly, err := core.ComputeSacsParMois(&ds, from, to)
+	if err != nil {
+		s.renderPage(w, "stats", "Statistiques", "stats", statsView{}, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+		return
+	}
+	avg, err := core.ComputeCoutMoyenParSac(&ds, from, to)
+	if err != nil {
+		s.renderPage(w, "stats", "Statistiques", "stats", statsView{}, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
+		return
+	}
+	view := newStatsView(&ds, invested, consumed, avg, monthly, inventory, details)
+	s.renderPage(w, "stats", "Statistiques", "stats", view, nil)
+}
+
+func (s *Server) renderHomePage(w http.ResponseWriter, flash *flashMessage) {
+	ds := s.store.Data()
+	view := newHomeView(&ds)
+	s.renderPage(w, "home", "Achats", "purchases", view, flash)
+}
+
+func (s *Server) renderBrandsPage(w http.ResponseWriter, flash *flashMessage) {
+	ds := s.store.Data()
+	view := newBrandsView(&ds)
+	s.renderPage(w, "brands", "Marques", "brands", view, flash)
+}
+
+func (s *Server) renderConsumptionsPage(w http.ResponseWriter, flash *flashMessage) {
+	ds := s.store.Data()
+	view := newConsumptionsView(&ds)
+	s.renderPage(w, "consumptions", "Consommations", "consumptions", view, flash)
+}
+
+func (s *Server) successFlash(r *http.Request, expected, message string) *flashMessage {
+	if r.URL.Query().Get("added") == expected {
+		return &flashMessage{Kind: "success", Message: message}
+	}
+	return nil
+}
+
+func (s *Server) friendlyError(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch {
+	case errors.Is(err, core.ErrBrandNotFound):
+		return "Marque introuvable"
+	case errors.Is(err, core.ErrBrandInUse):
+		return "La marque est référencée, impossible de la supprimer"
+	case errors.Is(err, core.ErrInsufficientInventory):
+		return "Inventaire insuffisant pour cette opération"
+	default:
+		var vErr core.ValidationErrors
+		if errors.As(err, &vErr) {
+			return vErr.Error()
+		}
+		return err.Error()
+	}
+}
+
+func (s *Server) handleBrandsAPI(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.listBrands(w, r)
@@ -70,7 +315,7 @@ func (s *Server) handleBrands(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handlePurchases(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePurchasesAPI(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.listPurchases(w, r)
@@ -81,7 +326,7 @@ func (s *Server) handlePurchases(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handlePurchaseByID(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePurchaseByIDAPI(w http.ResponseWriter, r *http.Request) {
 	id := core.ID(strings.TrimPrefix(r.URL.Path, "/api/achats/"))
 	if id == "" || strings.ContainsRune(string(id), '/') {
 		http.NotFound(w, r)
@@ -97,7 +342,7 @@ func (s *Server) handlePurchaseByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleConsumptions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleConsumptionsAPI(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.listConsumptions(w, r)
@@ -108,7 +353,7 @@ func (s *Server) handleConsumptions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleConsumptionByID(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleConsumptionByIDAPI(w http.ResponseWriter, r *http.Request) {
 	id := core.ID(strings.TrimPrefix(r.URL.Path, "/api/consommations/"))
 	if id == "" || strings.ContainsRune(string(id), '/') {
 		http.NotFound(w, r)
@@ -124,7 +369,7 @@ func (s *Server) handleConsumptionByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleStatsAPI(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.methodNotAllowed(w, http.MethodGet)
 		return
@@ -236,6 +481,42 @@ type purchasePayload struct {
 	WeightKg    float64 `json:"weight_kg"`
 	UnitPrice   int64   `json:"unit_price_cents"`
 	Notes       string  `json:"notes"`
+}
+
+func parseIntField(value string) (int, error) {
+	return strconv.Atoi(strings.TrimSpace(value))
+}
+
+func parseFloatField(value string) (float64, error) {
+	cleaned := strings.ReplaceAll(strings.TrimSpace(value), ",", ".")
+	return strconv.ParseFloat(cleaned, 64)
+}
+
+func parseMoneyField(value string) (core.Money, error) {
+	cleaned := strings.ReplaceAll(strings.TrimSpace(value), ",", ".")
+	if cleaned == "" {
+		return 0, fmt.Errorf("prix unitaire requis")
+	}
+	amount, err := strconv.ParseFloat(cleaned, 64)
+	if err != nil {
+		return 0, fmt.Errorf("prix invalide: %w", err)
+	}
+	if amount < 0 {
+		return 0, errors.New("le prix ne peut pas être négatif")
+	}
+	return core.ParseMoney(amount), nil
+}
+
+func parseDateOnly(value string) (time.Time, error) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return time.Time{}, fmt.Errorf("date requise")
+	}
+	t, err := time.ParseInLocation("2006-01-02", v, time.UTC)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t, nil
 }
 
 func parseTime(value string) (time.Time, error) {
