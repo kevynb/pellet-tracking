@@ -26,7 +26,7 @@ type CreatePurchaseParams struct {
 	BrandID     ID
 	PurchasedAt time.Time
 	Bags        int
-	WeightKg    float64
+	BagWeightKg float64
 	UnitPrice   Money
 	Notes       string
 }
@@ -35,7 +35,7 @@ type CreatePurchaseParams struct {
 type UpdatePurchaseParams struct {
 	PurchasedAt time.Time
 	Bags        int
-	WeightKg    float64
+	BagWeightKg float64
 	UnitPrice   Money
 	Notes       string
 }
@@ -147,7 +147,7 @@ func AddPurchase(ds *DataStore, params CreatePurchaseParams) (Purchase, error) {
 		return Purchase{}, errors.New("nil datastore")
 	}
 
-	errs := validatePurchaseInput(ds, params.BrandID, params.Bags, params.WeightKg, params.UnitPrice, params.PurchasedAt)
+	errs := validatePurchaseInput(ds, params.BrandID, params.Bags, params.BagWeightKg, params.UnitPrice, params.PurchasedAt)
 	if len(errs) > 0 {
 		return Purchase{}, errs
 	}
@@ -167,7 +167,8 @@ func AddPurchase(ds *DataStore, params CreatePurchaseParams) (Purchase, error) {
 		BrandID:         params.BrandID,
 		PurchasedAt:     purchasedAt,
 		Bags:            params.Bags,
-		WeightKg:        params.WeightKg,
+		BagWeightKg:     params.BagWeightKg,
+		TotalWeightKg:   params.BagWeightKg * float64(params.Bags),
 		UnitPriceCents:  params.UnitPrice,
 		TotalPriceCents: params.UnitPrice.MulInt(params.Bags),
 		Notes:           strings.TrimSpace(params.Notes),
@@ -196,7 +197,7 @@ func UpdatePurchase(ds *DataStore, id ID, params UpdatePurchaseParams) (Purchase
 		return Purchase{}, ErrPurchaseNotFound
 	}
 
-	errs := validatePurchaseInput(ds, ds.Purchases[idx].BrandID, params.Bags, params.WeightKg, params.UnitPrice, params.PurchasedAt)
+	errs := validatePurchaseInput(ds, ds.Purchases[idx].BrandID, params.Bags, params.BagWeightKg, params.UnitPrice, params.PurchasedAt)
 	if len(errs) > 0 {
 		return Purchase{}, errs
 	}
@@ -210,7 +211,8 @@ func UpdatePurchase(ds *DataStore, id ID, params UpdatePurchaseParams) (Purchase
 	purchase := ds.Purchases[idx]
 	purchase.PurchasedAt = purchasedAt
 	purchase.Bags = params.Bags
-	purchase.WeightKg = params.WeightKg
+	purchase.BagWeightKg = params.BagWeightKg
+	purchase.TotalWeightKg = params.BagWeightKg * float64(params.Bags)
 	purchase.UnitPriceCents = params.UnitPrice
 	purchase.TotalPriceCents = params.UnitPrice.MulInt(params.Bags)
 	purchase.Notes = strings.TrimSpace(params.Notes)
@@ -337,11 +339,11 @@ func DeleteConsumption(ds *DataStore, id ID) error {
 	return nil
 }
 
-func validatePurchaseInput(ds *DataStore, brandID ID, bags int, weightKg float64, unitPrice Money, purchasedAt time.Time) ValidationErrors {
+func validatePurchaseInput(ds *DataStore, brandID ID, bags int, bagWeightKg float64, unitPrice Money, purchasedAt time.Time) ValidationErrors {
 	errs := ValidationErrors{}
 	errs = errs.AppendIf(!brandExists(ds.Brands, brandID), "brand_id", "unknown brand")
 	errs = errs.AppendIf(bags <= 0, "bags", "bags must be greater than zero")
-	errs = errs.AppendIf(weightKg < 0, "weight_kg", "weight cannot be negative")
+	errs = errs.AppendIf(bagWeightKg <= 0, "bag_weight_kg", "bag weight must be greater than zero")
 	errs = errs.AppendIf(unitPrice.Int64() < 0, "unit_price", "unit price cannot be negative")
 	errs = errs.AppendIf(!purchasedAt.IsZero() && purchasedAt.After(time.Now().Add(24*time.Hour)), "purchased_at", "purchase date cannot be in the far future")
 	return errs

@@ -13,7 +13,7 @@
           <th>Date</th>
           <th>Marque</th>
           <th>Sacs</th>
-          <th>Poids (kg)</th>
+          <th>Poids total (kg)</th>
           <th>PU (€)</th>
           <th>Total</th>
           <th>Notes</th>
@@ -26,7 +26,7 @@
           <td>{{formatDate .PurchasedAt}}</td>
           <td>{{.BrandName}}</td>
           <td>{{.Bags}}</td>
-          <td>{{formatWeight .WeightKg}}</td>
+          <td>{{formatWeight .TotalWeightKg}}</td>
           <td>{{formatMoney .UnitPriceCents}}</td>
           <td>{{formatMoney .TotalPriceCents}}</td>
           <td>{{.Notes}}</td>
@@ -66,8 +66,8 @@
             <input type="number" name="bags" min="1" step="1" required>
           </label>
           <label>
-            Poids total (kg)
-            <input type="number" name="weight_kg" min="0" step="0.1" required>
+            Poids par sac (kg)
+            <input type="number" name="bag_weight_kg" min="0.1" step="0.1" required>
           </label>
           <label>
             Prix unitaire (€)
@@ -78,7 +78,10 @@
             <textarea name="notes" placeholder="Commentaires optionnels"></textarea>
           </label>
         </div>
-        <p>Total estimé : <output data-role="purchase-total">0,00 €</output></p>
+        <p>
+          Total estimé : <output data-role="purchase-total">0,00 €</output><br>
+          Poids total : <output data-role="purchase-weight-total">0,0</output> kg
+        </p>
         <button type="submit">Enregistrer l'achat</button>
       </fieldset>
     </form>
