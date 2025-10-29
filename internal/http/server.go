@@ -16,20 +16,25 @@ import (
 	"time"
 
 	"pellets-tracker/internal/core"
-	"pellets-tracker/internal/store"
 )
+
+// DataStore defines the persistence contract required by the HTTP server.
+type DataStore interface {
+	Data() core.DataStore
+	Replace(core.DataStore) error
+}
 
 // Server exposes the HTTP API for the pellets tracker application.
 type Server struct {
-	store     *store.JSONStore
+	store     DataStore
 	mux       *http.ServeMux
 	templates map[string]*template.Template
 }
 
 // NewServer constructs a Server backed by the provided datastore.
-func NewServer(store *store.JSONStore) *Server {
+func NewServer(store DataStore) *Server {
 	if store == nil {
-		panic("nil JSONStore")
+		panic("nil datastore")
 	}
 	s := &Server{store: store, mux: http.NewServeMux(), templates: newTemplateSet()}
 	s.registerRoutes()
@@ -115,9 +120,9 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Nombre de sacs invalide"})
 			return
 		}
-		weightKg, err := parseFloatField(r.FormValue("weight_kg"))
+		bagWeightKg, err := parseFloatField(r.FormValue("bag_weight_kg"))
 		if err != nil {
-			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Poids invalide"})
+			s.renderHomePage(w, &flashMessage{Kind: "error", Message: "Poids par sac invalide"})
 			return
 		}
 		unitPrice, err := parseMoneyField(r.FormValue("unit_price_eur"))
@@ -130,7 +135,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			BrandID:     core.ID(strings.TrimSpace(r.FormValue("brand_id"))),
 			PurchasedAt: purchasedAt,
 			Bags:        bags,
-			WeightKg:    weightKg,
+			BagWeightKg: bagWeightKg,
 			UnitPrice:   unitPrice,
 			Notes:       strings.TrimSpace(r.FormValue("notes")),
 		})
@@ -478,9 +483,20 @@ type purchasePayload struct {
 	BrandID     core.ID `json:"brand_id"`
 	PurchasedAt string  `json:"purchased_at"`
 	Bags        int     `json:"bags"`
+	BagWeightKg float64 `json:"bag_weight_kg"`
 	WeightKg    float64 `json:"weight_kg"`
 	UnitPrice   int64   `json:"unit_price_cents"`
 	Notes       string  `json:"notes"`
+}
+
+func (p purchasePayload) effectiveBagWeight() float64 {
+	if p.BagWeightKg > 0 {
+		return p.BagWeightKg
+	}
+	if p.WeightKg > 0 && p.Bags > 0 {
+		return p.WeightKg / float64(p.Bags)
+	}
+	return 0
 }
 
 func parseIntField(value string) (int, error) {
@@ -542,7 +558,7 @@ func (s *Server) createPurchase(w http.ResponseWriter, r *http.Request) {
 		BrandID:     payload.BrandID,
 		PurchasedAt: purchasedAt,
 		Bags:        payload.Bags,
-		WeightKg:    payload.WeightKg,
+		BagWeightKg: payload.effectiveBagWeight(),
 		UnitPrice:   core.Money(payload.UnitPrice),
 		Notes:       payload.Notes,
 	})
@@ -573,7 +589,7 @@ func (s *Server) updatePurchase(w http.ResponseWriter, r *http.Request, id core.
 	purchase, err := core.UpdatePurchase(&ds, id, core.UpdatePurchaseParams{
 		PurchasedAt: purchasedAt,
 		Bags:        payload.Bags,
-		WeightKg:    payload.WeightKg,
+		BagWeightKg: payload.effectiveBagWeight(),
 		UnitPrice:   core.Money(payload.UnitPrice),
 		Notes:       payload.Notes,
 	})
@@ -722,7 +738,7 @@ func (s *Server) exportCSV(w http.ResponseWriter, r *http.Request) {
 			brandNames[purchase.BrandID],
 			purchase.PurchasedAt.Format(time.RFC3339),
 			itoaInt(purchase.Bags),
-			formatFloat(purchase.WeightKg),
+			formatFloat(purchase.TotalWeightKg),
 			itoaMoney(purchase.UnitPriceCents),
 			itoaMoney(purchase.TotalPriceCents),
 			purchase.Notes,

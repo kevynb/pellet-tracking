@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"math"
 	"strings"
 	"time"
@@ -55,10 +56,49 @@ type Purchase struct {
 	BrandID         ID        `json:"brand_id"`
 	PurchasedAt     time.Time `json:"purchased_at"`
 	Bags            int       `json:"bags"`
-	WeightKg        float64   `json:"weight_kg"`
+	BagWeightKg     float64   `json:"bag_weight_kg"`
+	TotalWeightKg   float64   `json:"total_weight_kg"`
 	UnitPriceCents  Money     `json:"unit_price_cents"`
 	TotalPriceCents Money     `json:"total_price_cents"`
 	Notes           string    `json:"notes,omitempty"`
+}
+
+// MarshalJSON emits both the per-bag and total weight fields while keeping
+// compatibility with the historical weight_kg property that represented the
+// total purchase weight.
+func (p Purchase) MarshalJSON() ([]byte, error) {
+	type alias Purchase
+	return json.Marshal(struct {
+		alias
+		WeightKg float64 `json:"weight_kg,omitempty"`
+	}{
+		alias:    alias(p),
+		WeightKg: p.TotalWeightKg,
+	})
+}
+
+// UnmarshalJSON supports decoding both the new bag_weight_kg/total_weight_kg
+// fields and the legacy weight_kg field that stored the total weight directly.
+func (p *Purchase) UnmarshalJSON(data []byte) error {
+	type alias Purchase
+	aux := struct {
+		alias
+		WeightKg float64 `json:"weight_kg"`
+	}{}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	*p = Purchase(aux.alias)
+	if p.TotalWeightKg == 0 && aux.WeightKg > 0 {
+		p.TotalWeightKg = aux.WeightKg
+	}
+	if p.BagWeightKg == 0 && p.Bags > 0 && p.TotalWeightKg > 0 {
+		p.BagWeightKg = p.TotalWeightKg / float64(p.Bags)
+	}
+	if p.TotalWeightKg == 0 && p.BagWeightKg > 0 && p.Bags > 0 {
+		p.TotalWeightKg = p.BagWeightKg * float64(p.Bags)
+	}
+	return nil
 }
 
 // Consumption records pellets consumption events.

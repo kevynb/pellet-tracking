@@ -242,9 +242,9 @@ func newFIFOTracker(ds *DataStore) *fifoTracker {
 			state = &fifoState{}
 			tracker.states[purchase.BrandID] = state
 		}
-		weightPerBag := 0.0
-		if purchase.Bags > 0 {
-			weightPerBag = purchase.WeightKg / float64(purchase.Bags)
+		weightPerBag := purchase.BagWeightKg
+		if weightPerBag <= 0 && purchase.Bags > 0 {
+			weightPerBag = purchase.TotalWeightKg / float64(purchase.Bags)
 		}
 		state.lots = append(state.lots, &purchaseLot{
 			id:           purchase.ID,
