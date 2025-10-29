@@ -1,0 +1,55 @@
+{{define "brands"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "content"}}
+<section>
+  <h2>Marques</h2>
+  <p class="badge">{{len .Data.Brands}} marques enregistrées</p>
+  <div class="brand-gallery">
+    {{if .Data.Brands}}
+    {{range .Data.Brands}}
+    <article class="brand-card">
+      <header>
+        <h3>{{.Name}}</h3>
+      </header>
+      {{if .ImageBase64}}
+      <img src="{{printf "data:image/jpeg;base64,%s" .ImageBase64}}" alt="Illustration de la marque {{.Name}}">
+      {{end}}
+      {{if .Description}}
+      <p>{{.Description}}</p>
+      {{end}}
+      <p class="meta">Créée le {{formatDate .CreatedAt}}</p>
+    </article>
+    {{end}}
+    {{else}}
+    <p>Aucune marque définie pour le moment.</p>
+    {{end}}
+  </div>
+</section>
+<section style="margin-top: 2rem;">
+  <details open>
+    <summary>+ Ajouter une marque</summary>
+    <form method="post">
+      <fieldset>
+        <legend>Nouvelle marque</legend>
+        <div class="grid">
+          <label>
+            Nom
+            <input type="text" name="name" placeholder="Ex. Woodstock" required>
+          </label>
+          <label>
+            Description
+            <textarea name="description" placeholder="Notes, caractéristiques…"></textarea>
+          </label>
+          <label>
+            Image (Base64)
+            <textarea name="image_base64" placeholder="Coller une image encodée en Base64 (optionnel)"></textarea>
+          </label>
+        </div>
+        <button type="submit">Créer la marque</button>
+      </fieldset>
+    </form>
+  </details>
+</section>
+{{end}}

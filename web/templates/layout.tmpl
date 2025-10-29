@@ -1,0 +1,39 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="fr" hx-boost="true">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Pellets Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@2.0.6/css/pico.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="https://unpkg.com/alpinejs@3.14.0" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <nav>
+        <h1>Pellets Tracker</h1>
+        <ul>
+          <li><a href="/" class="{{if eq .ActiveNav "purchases"}}active{{end}}">Achats</a></li>
+          <li><a href="/consommations" class="{{if eq .ActiveNav "consumptions"}}active{{end}}">Consommations</a></li>
+          <li><a href="/stats" class="{{if eq .ActiveNav "stats"}}active{{end}}">Statistiques</a></li>
+          <li><a href="/marques" class="{{if eq .ActiveNav "brands"}}active{{end}}">Marques</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    {{if .Flash}}
+    <div class="flash {{if eq .Flash.Kind "success"}}flash-success{{else}}flash-error{{end}}">{{.Flash.Message}}</div>
+    {{end}}
+    {{block "content" .}}{{end}}
+  </main>
+  <footer class="container" style="padding-bottom: 2rem; color: #475569; font-size: 0.85rem;">
+    <p>Interface mobile-first propulsée par htmx &amp; Pico.css.</p>
+  </footer>
+</body>
+</html>
+{{end}}
