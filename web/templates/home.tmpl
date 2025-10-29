@@ -3,10 +3,15 @@
 {{end}}
 
 {{define "content"}}
-<section>
-  <h2>Achats récents</h2>
-  <p class="badge">Total investi : {{formatMoney .Data.TotalInvested}}</p>
-  <div class="table-responsive" id="purchases-table">
+<section class="surface stack">
+  <div class="section-header">
+    <div>
+      <h2>Achats récents</h2>
+      <p class="section-subtitle">Visualisez vos derniers approvisionnements et leurs montants.</p>
+    </div>
+    <p class="metric-pill">Total investi : {{formatMoney .Data.TotalInvested}}</p>
+  </div>
+  <div class="table-responsive">
     <table>
       <thead>
         <tr>
@@ -41,50 +46,51 @@
     </table>
   </div>
 </section>
-<section class="fab-container">
-  <details class="fab" open>
-    <summary>+ Achat</summary>
-    <form method="post" data-controller="purchase-form">
-      <fieldset>
-        <legend>Nouvel achat</legend>
-        <div class="grid grid-cols-2">
-          <label>
-            Marque
-            <select name="brand_id" required>
-              <option value="">Sélectionner…</option>
-              {{range .Data.Brands}}
-              <option value="{{.ID}}">{{.Name}}</option>
-              {{end}}
-            </select>
-          </label>
-          <label>
-            Date d'achat
-            <input type="date" name="purchased_at" data-default-today="true" required>
-          </label>
-          <label>
-            Nombre de sacs
-            <input type="number" name="bags" min="1" step="1" required>
-          </label>
-          <label>
-            Poids par sac (kg)
-            <input type="number" name="bag_weight_kg" min="0.1" step="0.1" required>
-          </label>
-          <label>
-            Prix unitaire (€)
-            <input type="number" name="unit_price_eur" min="0" step="0.01" required>
-          </label>
-          <label>
-            Notes
-            <textarea name="notes" placeholder="Commentaires optionnels"></textarea>
-          </label>
-        </div>
-        <p>
-          Total estimé : <output data-role="purchase-total">0,00 €</output><br>
-          Poids total : <output data-role="purchase-weight-total">0,0</output> kg
-        </p>
-        <button type="submit">Enregistrer l'achat</button>
-      </fieldset>
-    </form>
-  </details>
+
+<section class="surface stack">
+  <div class="section-header">
+    <div>
+      <h3>Ajouter un achat</h3>
+      <p class="section-subtitle">Saisissez le poids d'un sac et le nombre de sacs, le total est calculé automatiquement.</p>
+    </div>
+  </div>
+  <form method="post" data-controller="purchase-form" class="stack">
+    <div class="form-grid two-columns">
+      <label>
+        Marque
+        <select name="brand_id" required>
+          <option value="">Sélectionner…</option>
+          {{range .Data.Brands}}
+          <option value="{{.ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        Date d'achat
+        <input type="date" name="purchased_at" data-default-today="true" required>
+      </label>
+      <label>
+        Nombre de sacs
+        <input type="number" name="bags" min="1" step="1" required>
+      </label>
+      <label>
+        Poids par sac (kg)
+        <input type="number" name="bag_weight_kg" min="0.1" step="0.1" required>
+      </label>
+      <label>
+        Prix unitaire (€)
+        <input type="number" name="unit_price_eur" min="0" step="0.01" required>
+      </label>
+      <label>
+        Notes
+        <textarea name="notes" placeholder="Commentaires optionnels"></textarea>
+      </label>
+    </div>
+    <div>
+      Total estimé : <output data-role="purchase-total">0,00 €</output><br>
+      Poids total : <output data-role="purchase-weight-total">0,0</output> kg
+    </div>
+    <button type="submit">Enregistrer l'achat</button>
+  </form>
 </section>
 {{end}}

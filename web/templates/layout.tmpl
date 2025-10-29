@@ -11,28 +11,34 @@
   <script src="https://unpkg.com/alpinejs@3.14.0" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
-<body>
-  <header>
-    <div class="container">
-      <nav>
-        <h1>Pellets Tracker</h1>
-        <ul>
-          <li><a href="/" class="{{if eq .ActiveNav "purchases"}}active{{end}}">Achats</a></li>
-          <li><a href="/consommations" class="{{if eq .ActiveNav "consumptions"}}active{{end}}">Consommations</a></li>
-          <li><a href="/stats" class="{{if eq .ActiveNav "stats"}}active{{end}}">Statistiques</a></li>
-          <li><a href="/marques" class="{{if eq .ActiveNav "brands"}}active{{end}}">Marques</a></li>
-        </ul>
+<body class="app-shell">
+  <header class="app-hero">
+    <div class="container hero-grid">
+      <div class="hero-brand">
+        <span class="hero-logo" aria-hidden="true">🔥</span>
+        <div class="hero-text">
+          <h1>Pellets Tracker</h1>
+          <p>Suivez vos achats, votre stock et vos consommations de granulés en un clin d'œil.</p>
+        </div>
+      </div>
+      <nav class="main-nav" aria-label="Navigation principale">
+        <a href="/" class="nav-link {{if eq .ActiveNav "purchases"}}active{{end}}"><span>🛒</span>Achats</a>
+        <a href="/consommations" class="nav-link {{if eq .ActiveNav "consumptions"}}active{{end}}"><span>🔥</span>Consommations</a>
+        <a href="/stats" class="nav-link {{if eq .ActiveNav "stats"}}active{{end}}"><span>📊</span>Statistiques</a>
+        <a href="/marques" class="nav-link {{if eq .ActiveNav "brands"}}active{{end}}"><span>🏷️</span>Marques</a>
       </nav>
     </div>
   </header>
-  <main class="container">
+  <main class="container page-content">
     {{if .Flash}}
     <div class="flash {{if eq .Flash.Kind "success"}}flash-success{{else}}flash-error{{end}}">{{.Flash.Message}}</div>
     {{end}}
     {{block "content" .}}{{end}}
   </main>
-  <footer class="container" style="padding-bottom: 2rem; color: #475569; font-size: 0.85rem;">
-    <p>Interface mobile-first propulsée par htmx &amp; Pico.css.</p>
+  <footer class="footer">
+    <div class="container">
+      Interface mobile-first propulsée par htmx · Statistiques FIFO et export JSON/CSV.
+    </div>
   </footer>
 </body>
 </html>
