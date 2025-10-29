@@ -75,14 +75,14 @@ func TestAddBrand(t *testing.T) {
 			if tc.want.err == nil {
 				require.NoError(t, err, tc.name)
 				assert.Equal(t, tc.want.brandName, brand.Name, tc.name)
-				assert.Len(t, ds.Brands, tc.want.brandCount, tc.name)
+				assert.Equal(t, tc.want.brandCount, len(ds.Brands), tc.name)
 				assert.False(t, ds.Meta.UpdatedAt.IsZero(), tc.name)
 			} else {
 				assert.Error(t, err, tc.name)
 				var vErr core.ValidationErrors
 				assert.True(t, errors.As(err, &vErr), tc.name)
 				assert.True(t, vErr.Has("name"), tc.name)
-				assert.Len(t, ds.Brands, len(tc.params.datastore.Brands), tc.name)
+				assert.Equal(t, len(tc.params.datastore.Brands), len(ds.Brands), tc.name)
 			}
 		})
 	}
@@ -164,7 +164,7 @@ func TestAddPurchase(t *testing.T) {
 				var vErr core.ValidationErrors
 				assert.True(t, errors.As(err, &vErr), tc.name)
 				assert.True(t, vErr.Has("bag_weight_kg"), tc.name)
-				assert.Len(t, dsCopy.Purchases, len(tc.params.existing.Purchases), tc.name)
+				assert.Equal(t, len(tc.params.existing.Purchases), len(dsCopy.Purchases), tc.name)
 			}
 		})
 	}
@@ -333,7 +333,7 @@ func TestAddConsumption(t *testing.T) {
 			consumption, err := core.AddConsumption(&ds, tc.params.input)
 			require.NoError(t, err, tc.name)
 			assert.Equal(t, tc.want.bagCount, consumption.Bags, tc.name)
-			assert.Len(t, ds.Consumptions, 1, tc.name)
+			assert.Equal(t, 1, len(ds.Consumptions), tc.name)
 		})
 	}
 }

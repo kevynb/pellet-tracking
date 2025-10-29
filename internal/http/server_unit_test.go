@@ -99,9 +99,11 @@ func TestServer_createPurchase(t *testing.T) {
 				if tc.want.expectErrorBody {
 					return tc.params.replaceErr
 				}
-				require.Len(t, ds.Purchases, 1, tc.name)
-				require.InDelta(t, tc.want.expectTotalKg, ds.Purchases[0].TotalWeightKg, 1e-9, tc.name)
-				require.InDelta(t, tc.want.expectBagWeight, ds.Purchases[0].BagWeightKg, 1e-9, tc.name)
+				if !assert.Equal(t, 1, len(ds.Purchases), tc.name) {
+					return tc.params.replaceErr
+				}
+				assert.InDelta(t, tc.want.expectTotalKg, ds.Purchases[0].TotalWeightKg, 1e-9, tc.name)
+				assert.InDelta(t, tc.want.expectBagWeight, ds.Purchases[0].BagWeightKg, 1e-9, tc.name)
 				return tc.params.replaceErr
 			}).Times(1)
 
