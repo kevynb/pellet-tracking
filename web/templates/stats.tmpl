@@ -3,33 +3,37 @@
 {{end}}
 
 {{define "content"}}
-<section>
-  <h2>Statistiques</h2>
+<section class="surface stack">
+  <div class="section-header">
+    <div>
+      <h2>Statistiques</h2>
+      <p class="section-subtitle">Synthèse complète de vos investissements, consommations et stocks.</p>
+    </div>
+  </div>
   <div class="card-grid">
     <article class="inventory-card">
       <h3>Total investi</h3>
-      <p style="font-size: 1.6rem;">{{formatMoney .Data.Invested}}</p>
+      <p style="font-size: 1.6rem; margin: 0;">{{formatMoney .Data.Invested}}</p>
       <p class="meta">Achats sur la période sélectionnée</p>
     </article>
     <article class="inventory-card">
       <h3>Coût consommé (FIFO)</h3>
-      <p style="font-size: 1.6rem;">{{formatMoney .Data.Consumed}}</p>
+      <p style="font-size: 1.6rem; margin: 0;">{{formatMoney .Data.Consumed}}</p>
       <p class="meta">Valorisation FIFO des consommations</p>
     </article>
     <article class="inventory-card">
       <h3>Coût moyen par sac</h3>
-      <p style="font-size: 1.6rem;">{{formatMoney .Data.Average}}</p>
+      <p style="font-size: 1.6rem; margin: 0;">{{formatMoney .Data.Average}}</p>
       <p class="meta">Basé sur la consommation FIFO</p>
     </article>
     <article class="inventory-card">
       <h3>Inventaire restant</h3>
-      <p class="meta">
-        {{.Data.Inventory.TotalBags}} sacs · {{formatWeight .Data.Inventory.TotalWeightKg}} kg · {{formatMoney .Data.Inventory.TotalCost}}
-      </p>
+      <p class="meta">{{.Data.Inventory.TotalBags}} sacs · {{formatWeight .Data.Inventory.TotalWeightKg}} kg · {{formatMoney .Data.Inventory.TotalCost}}</p>
     </article>
   </div>
 </section>
-<section style="margin-top: 2rem;">
+
+<section class="surface stack">
   <h3>Consommation mensuelle</h3>
   {{if .Data.Monthly}}
   <div class="chart-bar">
@@ -41,10 +45,11 @@
     {{end}}
   </div>
   {{else}}
-  <p>Aucune consommation sur la période.</p>
+  <p class="meta">Aucune consommation sur la période.</p>
   {{end}}
 </section>
-<section style="margin-top: 2rem;">
+
+<section class="surface stack">
   <h3>Inventaire détaillé</h3>
   <div class="inventory-list">
     {{if .Data.Inventory.Brands}}
@@ -55,11 +60,12 @@
     </article>
     {{end}}
     {{else}}
-    <p>Inventaire vide, toutes les consommations ont été valorisées.</p>
+    <p class="meta">Inventaire vide, toutes les consommations ont été valorisées.</p>
     {{end}}
   </div>
 </section>
-<section style="margin-top: 2rem;">
+
+<section class="surface stack">
   <h3>Détails FIFO</h3>
   {{if .Data.Details}}
   <div class="table-responsive">
@@ -92,7 +98,7 @@
     </table>
   </div>
   {{else}}
-  <p>Aucune consommation valorisée.</p>
+  <p class="meta">Aucune consommation valorisée.</p>
   {{end}}
 </section>
 {{end}}

@@ -3,8 +3,13 @@
 {{end}}
 
 {{define "content"}}
-<section>
-  <h2>Consommations</h2>
+<section class="surface stack">
+  <div class="section-header">
+    <div>
+      <h2>Consommations</h2>
+      <p class="section-subtitle">Enregistrez vos brûlages pour suivre le stock restant en temps réel.</p>
+    </div>
+  </div>
   <div class="table-responsive">
     <table>
       <thead>
@@ -34,38 +39,39 @@
     </table>
   </div>
 </section>
-<section style="margin-top: 2rem;">
-  <details open>
-    <summary>+ Enregistrer une consommation</summary>
-    <form method="post">
-      <fieldset>
-        <legend>Nouvelle consommation</legend>
-        <div class="grid grid-cols-2">
-          <label>
-            Marque
-            <select name="brand_id" required>
-              <option value="">Sélectionner…</option>
-              {{range .Data.Brands}}
-              <option value="{{.ID}}">{{.Name}}</option>
-              {{end}}
-            </select>
-          </label>
-          <label>
-            Date de consommation
-            <input type="date" name="consumed_at" data-default-today="true" required>
-          </label>
-          <label>
-            Nombre de sacs
-            <input type="number" name="bags" min="1" step="1" required>
-          </label>
-          <label>
-            Notes
-            <textarea name="notes" placeholder="Commentaires"></textarea>
-          </label>
-        </div>
-        <button type="submit">Ajouter la consommation</button>
-      </fieldset>
-    </form>
-  </details>
+
+<section class="surface stack">
+  <div class="section-header">
+    <div>
+      <h3>Ajouter une consommation</h3>
+      <p class="section-subtitle">Sélectionnez une marque puis indiquez le nombre de sacs consommés.</p>
+    </div>
+  </div>
+  <form method="post" class="stack">
+    <div class="form-grid two-columns">
+      <label>
+        Marque
+        <select name="brand_id" required>
+          <option value="">Sélectionner…</option>
+          {{range .Data.Brands}}
+          <option value="{{.ID}}">{{.Name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label>
+        Date de consommation
+        <input type="date" name="consumed_at" data-default-today="true" required>
+      </label>
+      <label>
+        Nombre de sacs
+        <input type="number" name="bags" min="1" step="1" required>
+      </label>
+      <label>
+        Notes
+        <textarea name="notes" placeholder="Commentaires"></textarea>
+      </label>
+    </div>
+    <button type="submit">Ajouter la consommation</button>
+  </form>
 </section>
 {{end}}
