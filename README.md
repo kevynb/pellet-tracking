@@ -2,6 +2,21 @@
 
 Pellets Tracker est une application Go qui suit vos achats, consommations et stocks de granulés, avec une interface web mobile-first et une API JSON complète.
 
+## Architecture
+
+L'application est organisée par responsabilités nettes :
+
+- `cmd/app/main.go` initialise la configuration, ouvre le magasin JSON, installe le serveur HTTP et, si activé, le listener TSnet.
+- `internal/config` charge la configuration via les variables d'environnement et prépare les chemins de données.
+- `internal/store` gère la persistance JSON (RWMutex, sauvegardes rotatives, clonage).
+- `internal/core` contient le domaine : modèles, opérations métier (CRUD, validations), calculs statistiques FIFO et outils monétaires.
+- `internal/http` expose l'API REST, la couche middleware (log, compression, erreurs) et les vues HTML.
+- `internal/tsnet` encapsule l'écouteur Tailscale optionnel pour publier le service sur votre réseau.
+- `web` regroupe les templates Go et les ressources statiques (CSS/JS) embarquées dans le binaire.
+- `test/e2e` héberge les tests de bout en bout qui démarrent le binaire compilé et valident l'API ainsi que le rendu HTML.
+
+Tous les tests Go respectent des conventions strictes (tests table-driven, usage de `stretchr/testify`, mocks générés via `mockgen`) décrites dans `AGENTS.md`.
+
 ## Démarrage rapide
 
 ```bash
