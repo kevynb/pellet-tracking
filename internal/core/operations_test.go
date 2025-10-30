@@ -292,9 +292,7 @@ func TestAddConsumption(t *testing.T) {
 		input     core.CreateConsumptionParams
 	}
 	type want struct {
-		err           error
-		consumptionID core.ID
-		bagCount      int
+		bagCount int
 	}
 
 	seed := core.DataStore{}
@@ -318,7 +316,6 @@ func TestAddConsumption(t *testing.T) {
 				},
 			},
 			want: want{
-				err:      nil,
 				bagCount: 2,
 			},
 		},

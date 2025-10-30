@@ -435,7 +435,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) listBrands(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listBrands(w http.ResponseWriter, _ *http.Request) {
 	ds := s.store.Data()
 	brands := ds.Brands
 	sort.Slice(brands, func(i, j int) bool {
@@ -474,7 +474,7 @@ func (s *Server) createBrand(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusCreated, brand)
 }
 
-func (s *Server) listPurchases(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listPurchases(w http.ResponseWriter, _ *http.Request) {
 	ds := s.store.Data()
 	s.writeJSON(w, http.StatusOK, ds.Purchases)
 }
@@ -605,7 +605,7 @@ func (s *Server) updatePurchase(w http.ResponseWriter, r *http.Request, id core.
 	s.writeJSON(w, http.StatusOK, purchase)
 }
 
-func (s *Server) deletePurchase(w http.ResponseWriter, r *http.Request, id core.ID) {
+func (s *Server) deletePurchase(w http.ResponseWriter, _ *http.Request, id core.ID) {
 	ds := s.store.Data()
 	if err := core.DeletePurchase(&ds, id); err != nil {
 		s.handleCoreError(w, err)
@@ -626,7 +626,7 @@ type consumptionPayload struct {
 	Notes      string  `json:"notes"`
 }
 
-func (s *Server) listConsumptions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listConsumptions(w http.ResponseWriter, _ *http.Request) {
 	ds := s.store.Data()
 	s.writeJSON(w, http.StatusOK, ds.Consumptions)
 }
@@ -690,7 +690,7 @@ func (s *Server) updateConsumption(w http.ResponseWriter, r *http.Request, id co
 	s.writeJSON(w, http.StatusOK, consumption)
 }
 
-func (s *Server) deleteConsumption(w http.ResponseWriter, r *http.Request, id core.ID) {
+func (s *Server) deleteConsumption(w http.ResponseWriter, _ *http.Request, id core.ID) {
 	ds := s.store.Data()
 	if err := core.DeleteConsumption(&ds, id); err != nil {
 		s.handleCoreError(w, err)
@@ -704,7 +704,7 @@ func (s *Server) deleteConsumption(w http.ResponseWriter, r *http.Request, id co
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) exportJSON(w http.ResponseWriter, r *http.Request) {
+func (s *Server) exportJSON(w http.ResponseWriter, _ *http.Request) {
 	ds := s.store.Data()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=pellets-datastore.json")
@@ -713,7 +713,7 @@ func (s *Server) exportJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) exportCSV(w http.ResponseWriter, r *http.Request) {
+func (s *Server) exportCSV(w http.ResponseWriter, _ *http.Request) {
 	ds := s.store.Data()
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=pellets-export.csv")

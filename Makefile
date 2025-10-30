@@ -24,7 +24,7 @@ lint: $(GOBIN)/golangci-lint
 	golangci-lint run ./...
 
 $(GOBIN)/golangci-lint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.1
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 e2e: build
 	go test ./test/e2e -count=1 -parallel=4

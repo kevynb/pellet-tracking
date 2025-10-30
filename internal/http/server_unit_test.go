@@ -13,9 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.uber.org/mock/gomock"
 	"pellets-tracker/internal/core"
 	"pellets-tracker/internal/http/mock"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestServer_createPurchase(t *testing.T) {

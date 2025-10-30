@@ -70,7 +70,6 @@ func TestComputeConsoValue(t *testing.T) {
 	}
 	type want struct {
 		total core.Money
-		err   error
 	}
 
 	ds := sampleDataStore(t)
