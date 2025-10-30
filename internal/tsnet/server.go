@@ -1,3 +1,5 @@
+// Package tsnet provides helpers to expose the pellets tracker over a Tailscale
+// tsnet listener.
 package tsnet
 
 import (
@@ -7,6 +9,7 @@ import (
 	"tailscale.com/tsnet"
 )
 
+// Config defines the TSnet server parameters.
 type Config struct {
 	Hostname string
 	Dir      string
@@ -14,11 +17,13 @@ type Config struct {
 	Listen   string
 }
 
+// Server manages the lifecycle of a tsnet-backed listener.
 type Server struct {
 	cfg    Config
 	server *tsnet.Server
 }
 
+// New constructs a Server from the provided configuration.
 func New(cfg Config) (*Server, error) {
 	if cfg.Listen == "" {
 		cfg.Listen = ":443"
@@ -36,6 +41,7 @@ func New(cfg Config) (*Server, error) {
 	return &Server{cfg: cfg, server: ts}, nil
 }
 
+// Listen opens the configured TSnet listener for HTTPS traffic.
 func (s *Server) Listen() (net.Listener, error) {
 	if s.server == nil {
 		return nil, fmt.Errorf("tsnet server not initialised")
@@ -43,6 +49,7 @@ func (s *Server) Listen() (net.Listener, error) {
 	return s.server.Listen("tcp", s.cfg.Listen)
 }
 
+// Close releases the underlying TSnet server resources.
 func (s *Server) Close() error {
 	if s.server == nil {
 		return nil

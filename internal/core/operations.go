@@ -115,7 +115,7 @@ func UpdateBrand(ds *DataStore, id ID, params UpdateBrandParams) (Brand, error) 
 	brand.Name = name
 	brand.Description = strings.TrimSpace(params.Description)
 	brand.ImageBase64 = strings.TrimSpace(params.ImageBase64)
-	brand.Meta.UpdatedAt = now
+	brand.UpdatedAt = now
 	ds.Brands[idx] = brand
 
 	touchDatastore(ds, now)
@@ -216,7 +216,7 @@ func UpdatePurchase(ds *DataStore, id ID, params UpdatePurchaseParams) (Purchase
 	purchase.UnitPriceCents = params.UnitPrice
 	purchase.TotalPriceCents = params.UnitPrice.MulInt(params.Bags)
 	purchase.Notes = strings.TrimSpace(params.Notes)
-	purchase.Meta.UpdatedAt = now
+	purchase.UpdatedAt = now
 	ds.Purchases[idx] = purchase
 
 	sort.Slice(ds.Purchases, func(i, j int) bool {
@@ -311,7 +311,7 @@ func UpdateConsumption(ds *DataStore, id ID, params UpdateConsumptionParams) (Co
 	consumption.ConsumedAt = consumedAt
 	consumption.Bags = params.Bags
 	consumption.Notes = strings.TrimSpace(params.Notes)
-	consumption.Meta.UpdatedAt = now
+	consumption.UpdatedAt = now
 	ds.Consumptions[idx] = consumption
 
 	sort.Slice(ds.Consumptions, func(i, j int) bool {
@@ -423,11 +423,11 @@ func findConsumptionIndex(consumptions []Consumption, id ID) int {
 }
 
 func touchDatastore(ds *DataStore, ts time.Time) {
-	if ds.Meta.ID == "" {
-		ds.Meta.ID = NewID()
+	if ds.ID == "" {
+		ds.ID = NewID()
 	}
-	if ds.Meta.CreatedAt.IsZero() {
-		ds.Meta.CreatedAt = ts
+	if ds.CreatedAt.IsZero() {
+		ds.CreatedAt = ts
 	}
-	ds.Meta.UpdatedAt = ts
+	ds.UpdatedAt = ts
 }

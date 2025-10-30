@@ -76,7 +76,7 @@ func TestAddBrand(t *testing.T) {
 				require.NoError(t, err, tc.name)
 				assert.Equal(t, tc.want.brandName, brand.Name, tc.name)
 				assert.Equal(t, tc.want.brandCount, len(ds.Brands), tc.name)
-				assert.False(t, ds.Meta.UpdatedAt.IsZero(), tc.name)
+				assert.False(t, ds.UpdatedAt.IsZero(), tc.name)
 			} else {
 				assert.Error(t, err, tc.name)
 				var vErr core.ValidationErrors

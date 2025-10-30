@@ -1,13 +1,26 @@
+version: 2
+
 run:
   timeout: 5m
   tests: true
 linters:
+  fast: false
+  presets: []
+  disable-all: true
   enable:
     - govet
-    - gofmt
-    - goimports
     - revive
     - staticcheck
+  disable:
+    - errcheck
+    - ineffassign
+    - unused
+
+formatters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
 issues:
   exclude-rules:
     - path: _test\.go
