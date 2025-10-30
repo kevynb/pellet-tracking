@@ -1,3 +1,4 @@
+// Package http exposes the REST API handlers and HTML views for the pellets tracker server.
 package http
 
 import (

@@ -1,3 +1,4 @@
+// Package main bootstraps the pellets tracker HTTP and TSnet servers.
 package main
 
 import (

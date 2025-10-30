@@ -1,3 +1,4 @@
+// Package store persists the pellets tracker datastore to disk using JSON snapshots and backups.
 package store
 
 import (
@@ -90,13 +91,13 @@ func Load(path string) (*core.DataStore, error) {
 		return nil, fmt.Errorf("decode datastore: %w", err)
 	}
 
-	if ds.Meta.ID == "" {
-		ds.Meta.ID = core.NewID()
+	if ds.ID == "" {
+		ds.ID = core.NewID()
 	}
-	if ds.Meta.CreatedAt.IsZero() {
-		ds.Meta.CreatedAt = time.Now().UTC()
+	if ds.CreatedAt.IsZero() {
+		ds.CreatedAt = time.Now().UTC()
 	}
-	ds.Meta.UpdatedAt = time.Now().UTC()
+	ds.UpdatedAt = time.Now().UTC()
 
 	return &ds, nil
 }
@@ -108,7 +109,7 @@ func Save(path, backupDir string, data *core.DataStore) error {
 		return fmt.Errorf("nil datastore")
 	}
 
-	data.Meta.UpdatedAt = time.Now().UTC()
+	data.UpdatedAt = time.Now().UTC()
 
 	if err := Backup(path, backupDir); err != nil {
 		return fmt.Errorf("backup datastore: %w", err)

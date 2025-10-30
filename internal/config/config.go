@@ -1,3 +1,4 @@
+// Package config loads environment-driven configuration for the pellets tracker service.
 package config
 
 import (

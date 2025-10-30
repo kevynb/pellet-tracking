@@ -2,6 +2,9 @@ SHELL := /bin/bash
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/pellets
 GOBIN := $(CURDIR)/bin
+GOLANGCI_LINT_VERSION := 2.6.0
+GOLANGCI_LINT_TAG := v$(GOLANGCI_LINT_VERSION)
+GOLANGCI_LINT_ARCHIVE := https://github.com/golangci/golangci-lint/releases/download/$(GOLANGCI_LINT_TAG)/golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64.tar.gz
 
 export GOBIN
 export PATH := $(GOBIN):$(PATH)
@@ -24,7 +27,12 @@ lint: $(GOBIN)/golangci-lint
 	golangci-lint run ./...
 
 $(GOBIN)/golangci-lint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+	@mkdir -p $(GOBIN)
+	tmp_dir=$$(mktemp -d); \
+		curl -sSL $(GOLANGCI_LINT_ARCHIVE) -o $$tmp_dir/golangci-lint.tar.gz; \
+		tar -xzf $$tmp_dir/golangci-lint.tar.gz -C $$tmp_dir; \
+		install -m 0755 $$tmp_dir/golangci-lint-$(GOLANGCI_LINT_VERSION)-linux-amd64/golangci-lint $(GOBIN)/golangci-lint; \
+		rm -rf $$tmp_dir
 
 e2e: build
 	go test ./test/e2e -count=1 -parallel=4

@@ -1,3 +1,4 @@
+// Package web embeds the HTML templates and static assets for the pellets tracker UI.
 package web
 
 import "embed"
