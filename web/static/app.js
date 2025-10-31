@@ -31,6 +31,55 @@
     }
   });
 
+  document.addEventListener('change', function (event) {
+    const input = event.target;
+    if (!input.matches('[data-role="brand-image-input"]')) return;
+
+    const form = input.closest('[data-controller="brand-form"]');
+    if (!form) return;
+
+    const hiddenField = form.querySelector('[data-role="brand-image-base64"]');
+    const feedback = form.querySelector('[data-role="brand-image-feedback"]');
+
+    if (hiddenField) {
+      hiddenField.value = '';
+    }
+
+    if (!input.files || input.files.length === 0) {
+      if (feedback) {
+        feedback.textContent = 'Aucune image sélectionnée.';
+      }
+      return;
+    }
+
+    const file = input.files[0];
+    if (feedback) {
+      feedback.textContent = `Conversion en cours… (${file.name})`;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function () {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      if (hiddenField) {
+        hiddenField.value = base64;
+      }
+      if (feedback) {
+        feedback.textContent = `Image prête : ${file.name}`;
+      }
+    };
+    reader.onerror = function () {
+      if (feedback) {
+        feedback.textContent = "Impossible de lire l'image sélectionnée.";
+      }
+      if (hiddenField) {
+        hiddenField.value = '';
+      }
+      input.value = '';
+    };
+    reader.readAsDataURL(file);
+  });
+
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('input[type="date"][data-default-today="true"]').forEach(function (input) {
       if (!input.value) {
