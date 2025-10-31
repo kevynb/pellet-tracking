@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -119,6 +120,16 @@ func templateFuncMap() template.FuncMap {
 		"formatWeight": func(v float64) string {
 			s := fmt.Sprintf("%.2f", v)
 			return strings.ReplaceAll(s, ".", ",")
+		},
+		"brandImageURL": func(b64 string) template.URL {
+			cleaned := strings.TrimSpace(b64)
+			if cleaned == "" {
+				return ""
+			}
+			if _, err := base64.StdEncoding.DecodeString(cleaned); err != nil {
+				return ""
+			}
+			return template.URL("data:image/jpeg;base64," + cleaned)
 		},
 	}
 }

@@ -181,10 +181,19 @@ func (s *Server) handleBrandsPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf(`{"type":"save","entity":"brand","id":"%s"}`, brand.ID)
+		if isHXRequest(r) {
+			w.Header().Set("HX-Redirect", "/marques?added=brand")
+			w.WriteHeader(http.StatusSeeOther)
+			return
+		}
 		http.Redirect(w, r, "/marques?added=brand", http.StatusSeeOther)
 	default:
 		s.methodNotAllowed(w, http.MethodGet, http.MethodPost)
 	}
+}
+
+func isHXRequest(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("HX-Request"), "true")
 }
 
 func (s *Server) handleConsumptionsPage(w http.ResponseWriter, r *http.Request) {

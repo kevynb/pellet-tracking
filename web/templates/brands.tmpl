@@ -14,13 +14,14 @@
   <div class="brand-gallery">
     {{if .Data.Brands}}
     {{range .Data.Brands}}
+    {{$brand := .}}
     <article class="brand-card">
       <div>
         <h3>{{.Name}}</h3>
         <p class="meta">Créée le {{formatDate .CreatedAt}}</p>
       </div>
-      {{if .ImageBase64}}
-      <img src="{{printf "data:image/jpeg;base64,%s" .ImageBase64}}" alt="Illustration de la marque {{.Name}}">
+      {{with brandImageURL $brand.ImageBase64}}
+      <img src="{{.}}" alt="Illustration de la marque {{$brand.Name}}">
       {{end}}
       {{if .Description}}
       <p>{{.Description}}</p>
