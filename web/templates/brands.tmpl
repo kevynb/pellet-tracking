@@ -37,10 +37,10 @@
   <div class="section-header">
     <div>
       <h3>Ajouter une marque</h3>
-      <p class="section-subtitle">Enrichissez vos fiches avec une description et une image depuis votre ordinateur.</p>
+      <p class="section-subtitle">Enrichissez vos fiches avec une description et une image encodée en Base64.</p>
     </div>
   </div>
-  <form method="post" class="stack" data-controller="brand-form">
+  <form method="post" class="stack">
     <div class="form-grid">
       <label>
         Nom
@@ -51,10 +51,8 @@
         <textarea name="description" placeholder="Notes, caractéristiques…"></textarea>
       </label>
       <label>
-        Image
-        <input type="file" accept="image/*" data-role="brand-image-input">
-        <input type="hidden" name="image_base64" data-role="brand-image-base64">
-        <small data-role="brand-image-feedback">Sélectionnez une image : elle sera automatiquement convertie.</small>
+        Image (Base64)
+        <textarea name="image_base64" placeholder="Collez une image encodée en Base64 (optionnel)"></textarea>
       </label>
     </div>
     <button type="submit">Créer la marque</button>
