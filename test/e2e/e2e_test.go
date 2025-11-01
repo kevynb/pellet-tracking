@@ -3,17 +3,21 @@ package e2e_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -250,6 +254,224 @@ func TestPelletsEndToEnd(t *testing.T) {
 			verifyPages(t, client, listenAddr, tc)
 		})
 	}
+}
+
+func TestBrandFormImageUpload(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	backupDir := filepath.Join(dataDir, "backups")
+	require.NoError(t, os.MkdirAll(backupDir, 0o755), "create backup dir")
+
+	listenAddr := freePort(t)
+	env := map[string]string{
+		"PELLETS_DATA_FILE":   filepath.Join(dataDir, "pellets.json"),
+		"PELLETS_BACKUP_DIR":  backupDir,
+		"PELLETS_LISTEN_ADDR": listenAddr,
+	}
+
+	client, stop := launchServer(t, env, "brand-form-image")
+	defer stop()
+
+	baseURL := fmt.Sprintf("http://%s", listenAddr)
+
+	form := url.Values{}
+	form.Set("name", "Flamme Douce")
+	form.Set("description", "Avec image")
+	form.Set("image_base64", "+g==")
+
+	postClient := *client
+	postClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	resp, err := postClient.PostForm(baseURL+"/marques", form)
+	require.NoError(t, err, "submit brand form")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode, "brand form redirect")
+
+	brandsPage := fetchHTML(t, client, baseURL+"/marques", "brand-form-image")
+	assert.Contains(t, brandsPage, "Flamme Douce", "brand name present")
+	assert.Contains(t, brandsPage, "data:image/jpeg;base64,&#43;g==", "brand image base64 present")
+	assert.NotContains(t, brandsPage, "#ZgotmplZ", "image should not be sanitized placeholder")
+}
+
+func TestBrandFormImageUploadBrowser(t *testing.T) {
+	t.Parallel()
+
+	chromePath := findChromePath()
+	if chromePath == "" {
+		t.Skip("chrome-based browser not available")
+	}
+
+	dataDir := t.TempDir()
+	backupDir := filepath.Join(dataDir, "backups")
+	require.NoError(t, os.MkdirAll(backupDir, 0o755), "create backup dir")
+
+	listenAddr := freePort(t)
+	env := map[string]string{
+		"PELLETS_DATA_FILE":   filepath.Join(dataDir, "pellets.json"),
+		"PELLETS_BACKUP_DIR":  backupDir,
+		"PELLETS_LISTEN_ADDR": listenAddr,
+	}
+
+	client, stop := launchServer(t, env, "brand-form-browser")
+	defer stop()
+
+	baseURL := fmt.Sprintf("http://%s", listenAddr)
+
+	imageData, err := base64.StdEncoding.DecodeString(onePixelPNGBase64)
+	require.NoError(t, err, "decode test image")
+	imagePath := filepath.Join(t.TempDir(), "pixel.png")
+	require.NoError(t, os.WriteFile(imagePath, imageData, 0o644), "write image file")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	allocator, cancelAllocator := chromedp.NewExecAllocator(ctx, append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath(chromePath),
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+	)...)
+	defer cancelAllocator()
+
+	browserCtx, cancelBrowser := chromedp.NewContext(allocator)
+	defer cancelBrowser()
+
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.Navigate(baseURL+"/marques"),
+		chromedp.WaitVisible(`form[data-controller="brand-form"]`, chromedp.ByQuery),
+		installBoostPolyfill(),
+		chromedp.SetValue(`input[name="name"]`, "Flamme Douce", chromedp.ByQuery),
+		chromedp.SetValue(`textarea[name="description"]`, "Depuis navigateur", chromedp.ByQuery),
+		chromedp.SetUploadFiles(`[data-role="brand-image-input"]`, []string{imagePath}, chromedp.ByQuery),
+		waitForFeedback("Image prête"),
+		chromedp.Click(`button[type="submit"]`, chromedp.ByQuery),
+		waitForLocationSuffix(baseURL, "/marques?added=brand"),
+	), "drive browser")
+
+	html := fetchHTML(t, client, baseURL+"/marques", "brand-form-browser")
+	assert.Contains(t, html, "Flamme Douce", "brand present")
+
+	cardSelector := `//article[contains(@class,'brand-card')][.//h3[contains(normalize-space(text()),'Flamme Douce')]]//img`
+	var src string
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.WaitVisible(cardSelector, chromedp.BySearch),
+		chromedp.AttributeValue(cardSelector, "src", &src, nil, chromedp.BySearch),
+	), "read brand image")
+	assert.True(t, strings.HasPrefix(src, "data:image/"), "image src is data URL")
+	assert.Contains(t, src, "base64,", "data url has base64 payload")
+	assert.NotContains(t, src, "ZgotmplZ", "image src should not be sanitized placeholder")
+}
+
+const onePixelPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lmcU9wAAAABJRU5ErkJggg=="
+
+func waitForFeedback(snippet string) chromedp.Action {
+	return chromedp.ActionFunc(func(ctx context.Context) error {
+		for {
+			var content string
+			if err := chromedp.Evaluate(`(() => { const el = document.querySelector('[data-role="brand-image-feedback"]'); return el ? el.textContent : ''; })()`, &content).Do(ctx); err != nil {
+				return err
+			}
+			if strings.Contains(content, snippet) {
+				return nil
+			}
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+}
+
+func waitForLocationSuffix(baseURL, path string) chromedp.Action {
+	expected := baseURL + path
+	return chromedp.ActionFunc(func(ctx context.Context) error {
+		for {
+			var current string
+			if err := chromedp.Location(&current).Do(ctx); err != nil {
+				return err
+			}
+			if strings.HasSuffix(current, path) || current == expected {
+				return nil
+			}
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+}
+
+func findChromePath() string {
+	candidates := []string{
+		os.Getenv("CHROME_PATH"),
+		os.Getenv("CHROME_BIN"),
+		os.Getenv("CHROMIUM_PATH"),
+		os.Getenv("CHROMIUM_BIN"),
+		"google-chrome",
+		"google-chrome-stable",
+		"chromium",
+		"chromium-browser",
+		"chrome",
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		path, err := exec.LookPath(candidate)
+		if err != nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		cmd := exec.CommandContext(ctx, path, "--version")
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+		if cmd.Run() == nil {
+			cancel()
+			return path
+		}
+		cancel()
+	}
+	return ""
+}
+
+func installBoostPolyfill() chromedp.Action {
+	script := `(() => {
+                const form = document.querySelector('form[data-controller="brand-form"]');
+                if (!form) {
+                        return;
+                }
+                form.addEventListener('submit', function (event) {
+                        event.preventDefault();
+                        const target = form.getAttribute('action');
+                        const method = (form.getAttribute('method') || 'get').toUpperCase();
+                        const destination = target && target.length > 0 ? new URL(target, window.location.href).toString() : window.location.href;
+                        fetch(destination, {
+                                method: method,
+                                body: method === 'GET' ? undefined : new FormData(form),
+                                redirect: 'manual',
+                                credentials: 'same-origin'
+                        }).then(function (response) {
+                                const hxRedirect = response.headers.get('HX-Redirect');
+                                if (hxRedirect) {
+                                        window.location.href = hxRedirect;
+                                        return;
+                                }
+                                if (response.status >= 200 && response.status < 300) {
+                                        response.text().then(function (html) {
+                                                document.open();
+                                                document.write(html);
+                                                document.close();
+                                        });
+                                }
+                        }).catch(function () {});
+                }, { once: true });
+        })();`
+	return chromedp.Evaluate(script, nil)
 }
 
 func registerBrands(t *testing.T, client *http.Client, addr string, seeds []brandSeed, caseName string) map[string]string {
