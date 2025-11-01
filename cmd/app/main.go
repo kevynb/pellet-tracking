@@ -31,7 +31,7 @@ func main() {
 		log.Fatalf("failed to initialize datastore: %v", err)
 	}
 
-	apiServer := httpserver.NewServer(dataStore)
+	apiServer := httpserver.NewServer(dataStore, httpserver.Config{MaxBrandImageBytes: cfg.BrandImageMaxBytes})
 
 	srv := &http.Server{
 		Addr:         cfg.ListenAddr,

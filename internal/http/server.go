@@ -2,12 +2,16 @@
 package http
 
 import (
+	"bytes"
 	"compress/gzip"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"image"
+	"image/jpeg"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +19,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	_ "image/gif"
+	_ "image/png"
+
+	"github.com/disintegration/imaging"
 
 	"pellets-tracker/internal/core"
 )
@@ -27,17 +36,45 @@ type DataStore interface {
 
 // Server exposes the HTTP API for the pellets tracker application.
 type Server struct {
-	store     DataStore
-	mux       *http.ServeMux
-	templates map[string]*template.Template
+	store              DataStore
+	mux                *http.ServeMux
+	templates          map[string]*template.Template
+	maxBrandImageBytes int64
 }
 
+// Config holds customization knobs for the HTTP server.
+type Config struct {
+	MaxBrandImageBytes int64
+}
+
+const (
+	defaultMaxBrandImageBytes = 5 * 1024 * 1024
+	brandImageTargetWidth     = 800
+	// brandImageRequestOverhead compensates for multipart boundaries and additional form fields.
+	// Without it a request containing an image close to the byte limit would be rejected before
+	// we have a chance to validate or resize it.
+	brandImageRequestOverhead = 512 * 1024
+)
+
+var (
+	errBrandImageTooLarge = errors.New("brand image too large")
+	errBrandImageInvalid  = errors.New("invalid brand image")
+)
+
 // NewServer constructs a Server backed by the provided datastore.
-func NewServer(store DataStore) *Server {
+func NewServer(store DataStore, cfg Config) *Server {
 	if store == nil {
 		panic("nil datastore")
 	}
-	s := &Server{store: store, mux: http.NewServeMux(), templates: newTemplateSet()}
+	if cfg.MaxBrandImageBytes <= 0 {
+		cfg.MaxBrandImageBytes = defaultMaxBrandImageBytes
+	}
+	s := &Server{
+		store:              store,
+		mux:                http.NewServeMux(),
+		templates:          newTemplateSet(),
+		maxBrandImageBytes: cfg.MaxBrandImageBytes,
+	}
 	s.registerRoutes()
 	return s
 }
@@ -161,15 +198,42 @@ func (s *Server) handleBrandsPage(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.renderBrandsPage(w, s.successFlash(r, "brand", "Marque enregistrée"))
 	case http.MethodPost:
-		if err := r.ParseForm(); err != nil {
-			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: "Formulaire invalide"})
+		maxBytes := s.effectiveMaxBrandImageBytes()
+		r.Body = http.MaxBytesReader(w, r.Body, maxBytes+brandImageRequestOverhead)
+		if err := r.ParseMultipartForm(maxBytes); err != nil {
+			if errors.Is(err, http.ErrNotMultipart) {
+				if err := r.ParseForm(); err != nil {
+					s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: "Formulaire invalide"})
+					return
+				}
+			} else {
+				w.WriteHeader(http.StatusBadRequest)
+				s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: "Fichier trop volumineux ou invalide"})
+				return
+			}
+		}
+
+		imageBase64, err := s.brandImageFromRequest(r)
+		if err != nil {
+			message := "Impossible de traiter l'image"
+			switch {
+			case errors.Is(err, errBrandImageTooLarge):
+				message = fmt.Sprintf("Image trop volumineuse (max %d Mo)", maxBytes/(1024*1024))
+			case errors.Is(err, errBrandImageInvalid):
+				message = "Format d'image non reconnu"
+			case errors.Is(err, http.ErrMissingFile):
+				message = "Téléversement de fichier invalide"
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: message})
 			return
 		}
+
 		ds := s.store.Data()
 		brand, err := core.AddBrand(&ds, core.CreateBrandParams{
 			Name:        r.FormValue("name"),
 			Description: r.FormValue("description"),
-			ImageBase64: strings.TrimSpace(r.FormValue("image_base64")),
+			ImageBase64: imageBase64,
 		})
 		if err != nil {
 			s.renderBrandsPage(w, &flashMessage{Kind: "error", Message: s.friendlyError(err)})
@@ -185,6 +249,55 @@ func (s *Server) handleBrandsPage(w http.ResponseWriter, r *http.Request) {
 	default:
 		s.methodNotAllowed(w, http.MethodGet, http.MethodPost)
 	}
+}
+
+func (s *Server) encodeBrandImage(r io.Reader) (string, error) {
+	maxBytes := s.effectiveMaxBrandImageBytes()
+
+	limit := maxBytes + 1
+	data, err := io.ReadAll(io.LimitReader(r, limit))
+	if err != nil {
+		return "", fmt.Errorf("read brand image: %w", err)
+	}
+	if int64(len(data)) > maxBytes {
+		return "", errBrandImageTooLarge
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", errBrandImageInvalid, err)
+	}
+
+	if img.Bounds().Dx() > brandImageTargetWidth {
+		img = imaging.Resize(img, brandImageTargetWidth, 0, imaging.Lanczos)
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+		return "", fmt.Errorf("encode brand image: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+}
+
+func (s *Server) brandImageFromRequest(r *http.Request) (string, error) {
+	file, _, err := r.FormFile("image_file")
+	switch {
+	case err == nil:
+		defer file.Close()
+		return s.encodeBrandImage(file)
+	case errors.Is(err, http.ErrMissingFile):
+		return "", nil
+	default:
+		return "", err
+	}
+}
+
+func (s *Server) effectiveMaxBrandImageBytes() int64 {
+	if s.maxBrandImageBytes <= 0 {
+		return defaultMaxBrandImageBytes
+	}
+	return s.maxBrandImageBytes
 }
 
 func (s *Server) handleConsumptionsPage(w http.ResponseWriter, r *http.Request) {

@@ -108,7 +108,7 @@ func TestServer_createPurchase(t *testing.T) {
 				return tc.params.replaceErr
 			}).Times(1)
 
-			server := NewServer(storeMock)
+			server := NewServer(storeMock, Config{})
 
 			body, err := json.Marshal(tc.params.payload)
 			require.NoError(t, err, tc.name)

@@ -62,7 +62,7 @@ func TestServerAPIIntegration(t *testing.T) {
 			jsonStore, err := store.NewJSONStore(dataFile, backupDir)
 			require.NoError(t, err, tc.name)
 
-			server := httpserver.NewServer(jsonStore)
+			server := httpserver.NewServer(jsonStore, httpserver.Config{})
 			ts := httptest.NewServer(server.Handler())
 			t.Cleanup(ts.Close)
 
