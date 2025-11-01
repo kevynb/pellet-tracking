@@ -5,26 +5,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // Config holds runtime configuration for the application.
 type Config struct {
-	DataFile        string
-	BackupDir       string
-	ListenAddr      string
-	TsnetEnabled    bool
-	TsnetDir        string
-	TsnetHostname   string
-	TsnetAuthKey    string
-	TsnetListenAddr string
+	DataFile           string
+	BackupDir          string
+	ListenAddr         string
+	TsnetEnabled       bool
+	TsnetDir           string
+	TsnetHostname      string
+	TsnetAuthKey       string
+	TsnetListenAddr    string
+	BrandImageMaxBytes int64
 }
 
 const (
-	defaultDataFile    = "data/pellets.json"
-	defaultBackupDir   = "data/backups"
-	defaultListenAddr  = "127.0.0.1:8080"
-	defaultTsnetDir    = "data/tsnet"
-	defaultTsnetListen = ":443"
+	defaultDataFile           = "data/pellets.json"
+	defaultBackupDir          = "data/backups"
+	defaultListenAddr         = "127.0.0.1:8080"
+	defaultTsnetDir           = "data/tsnet"
+	defaultTsnetListen        = ":443"
+	defaultBrandImageMaxBytes = 5 * 1024 * 1024
 )
 
 // Load builds a Config from environment variables, falling back to defaults
@@ -39,6 +42,12 @@ func Load() (*Config, error) {
 		TsnetListenAddr: getEnv("PELLETS_TSNET_LISTEN_ADDR", defaultTsnetListen),
 		TsnetAuthKey:    os.Getenv("PELLETS_TSNET_AUTHKEY"),
 	}
+
+	brandImageMaxBytes, err := getEnvInt64("PELLETS_BRAND_IMAGE_MAX_BYTES", defaultBrandImageMaxBytes)
+	if err != nil {
+		return nil, err
+	}
+	cfg.BrandImageMaxBytes = brandImageMaxBytes
 
 	if env := os.Getenv("PELLETS_TSNET_ENABLED"); env != "" {
 		switch env {
@@ -78,4 +87,18 @@ func getEnv(key, fallback string) string {
 		return val
 	}
 	return fallback
+}
+
+func getEnvInt64(key string, fallback int64) (int64, error) {
+	if val := os.Getenv(key); val != "" {
+		parsed, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid value for %s: %w", key, err)
+		}
+		if parsed <= 0 {
+			return 0, fmt.Errorf("invalid value for %s: must be positive", key)
+		}
+		return parsed, nil
+	}
+	return fallback, nil
 }
