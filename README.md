@@ -55,7 +55,15 @@ Construire l'image :
 make docker
 ```
 
-L'image expose le port `8080` et définit `PELLETS_DATA_FILE=/data/pellets.json`. Montez un volume persistant pour conserver vos données :
+L'image expose le port `8080` et définit `PELLETS_DATA_FILE=/data/pellets.json`. Elle démarre en tant que root puis change d'identité pour `UID/GID 65532` (l'utilisateur distroless "nonroot") par défaut. Personnalisez l'utilisateur propriétaire des fichiers en passant `PELLETS_RUN_UID` et `PELLETS_RUN_GID` :
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e PELLETS_RUN_UID=1000 -e PELLETS_RUN_GID=1000 \
+  -v $(pwd)/data:/data pellets-tracker:latest
+```
+
+Montez un volume persistant pour conserver vos données :
 
 ```bash
 docker run --rm -p 8080:8080 -v $(pwd)/data:/data pellets-tracker:latest

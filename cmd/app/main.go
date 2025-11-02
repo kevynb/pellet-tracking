@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -24,6 +25,12 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
+	}
+
+	if cfg.RunUID != nil {
+		if err := switchUser(*cfg.RunUID, *cfg.RunGID); err != nil {
+			log.Fatalf("failed to switch user: %v", err)
+		}
 	}
 
 	dataStore, err := store.NewJSONStore(cfg.DataFile, cfg.BackupDir)
@@ -100,4 +107,17 @@ func prepareListener(cfg *config.Config) (net.Listener, func() error, string, er
 		return nil, nil, "", err
 	}
 	return ln, tsServer.Close, cfg.TsnetListenAddr, nil
+}
+
+func switchUser(uid, gid int) error {
+	if os.Geteuid() == uid && os.Getegid() == gid {
+		return nil
+	}
+	if err := syscall.Setgid(gid); err != nil {
+		return fmt.Errorf("setgid %d: %w", gid, err)
+	}
+	if err := syscall.Setuid(uid); err != nil {
+		return fmt.Errorf("setuid %d: %w", uid, err)
+	}
+	return nil
 }
