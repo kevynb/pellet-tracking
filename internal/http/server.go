@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	// Register additional decoders for brand image uploads.
 	_ "image/gif"
 	_ "image/png"
 
