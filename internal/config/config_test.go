@@ -111,6 +111,8 @@ func TestLoadBrandImageMaxBytes(t *testing.T) {
 func TestLoadRunIdentityValidation(t *testing.T) {
 	t.Parallel()
 
+	requiresChown := runtime.GOOS != "windows" && os.Geteuid() == 0
+
 	type params struct {
 		uid string
 		gid string
@@ -148,7 +150,10 @@ func TestLoadRunIdentityValidation(t *testing.T) {
 				uid: "4321",
 				gid: "8765",
 			},
-			want: want{expectRun: true},
+			want: want{
+				expectRun: requiresChown,
+				expectErr: !requiresChown,
+			},
 		},
 	}
 
@@ -225,6 +230,10 @@ func TestLoadRunIdentityChown(t *testing.T) {
 
 	if runtime.GOOS == "windows" {
 		t.Skip("chown not supported on windows")
+	}
+
+	if os.Geteuid() != 0 {
+		t.Skip("requires root privileges to adjust ownership")
 	}
 
 	type params struct {
