@@ -120,6 +120,12 @@ func templateFuncMap() template.FuncMap {
 			s := fmt.Sprintf("%.2f", v)
 			return strings.ReplaceAll(s, ".", ",")
 		},
+		"brandImageURL": func(data string) template.URL {
+			if strings.TrimSpace(data) == "" {
+				return ""
+			}
+			return template.URL("data:image/jpeg;base64," + data)
+		},
 	}
 }
 

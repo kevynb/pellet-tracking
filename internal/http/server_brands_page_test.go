@@ -18,7 +18,7 @@ import (
 	"pellets-tracker/internal/core"
 )
 
-func TestServer_handleBrandsPage(t *testing.T) {
+func TestServer_handleBrandsPagePost(t *testing.T) {
 	t.Parallel()
 
 	makeImage := func(width, height int) []byte {
@@ -100,6 +100,7 @@ func TestServer_handleBrandsPage(t *testing.T) {
 			defer res.Body.Close()
 
 			assert.Equal(t, tc.want.statusCode, res.StatusCode, tc.name)
+
 			if tc.want.expectRedirect {
 				assert.Equal(t, "/marques?added=brand", res.Header.Get("Location"), tc.name)
 				require.True(t, store.replaced, tc.name)
@@ -118,6 +119,66 @@ func TestServer_handleBrandsPage(t *testing.T) {
 					assert.Contains(t, responseBody, tc.want.expectErrorText, tc.name)
 				}
 			}
+		})
+	}
+}
+
+func TestServer_handleBrandsPageGet(t *testing.T) {
+	t.Parallel()
+
+	type params struct {
+		existingBrand *core.Brand
+	}
+	type want struct {
+		statusCode      int
+		expectImageHTML string
+	}
+
+	tcs := []struct {
+		name   string
+		params params
+		want   want
+	}{
+		{
+			name: "renders existing brand image",
+			params: params{
+				existingBrand: &core.Brand{
+					Meta:        core.Meta{ID: core.NewID()},
+					Name:        "Alpha Pellets",
+					ImageBase64: "QUJD",
+				},
+			},
+			want: want{
+				statusCode:      http.StatusOK,
+				expectImageHTML: `src="data:image/jpeg;base64,QUJD"`,
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := &stubDataStore{}
+			if tc.params.existingBrand != nil {
+				store.data.Brands = append(store.data.Brands, *tc.params.existingBrand)
+			}
+
+			server := NewServer(store, Config{})
+
+			req := httptest.NewRequest(http.MethodGet, "/marques", nil)
+			rec := httptest.NewRecorder()
+
+			server.handleBrandsPage(rec, req)
+
+			res := rec.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tc.want.statusCode, res.StatusCode, tc.name)
+
+			responseBody := rec.Body.String()
+			assert.Contains(t, responseBody, tc.want.expectImageHTML, tc.name)
 		})
 	}
 }
