@@ -14,6 +14,7 @@ import (
 	"image/jpeg"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -24,7 +25,7 @@ import (
 	_ "image/gif"
 	_ "image/png"
 
-	"github.com/disintegration/imaging"
+	"golang.org/x/image/draw"
 
 	"pellets-tracker/internal/core"
 )
@@ -269,8 +270,16 @@ func (s *Server) encodeBrandImage(r io.Reader) (string, error) {
 		return "", fmt.Errorf("%w: %v", errBrandImageInvalid, err)
 	}
 
-	if img.Bounds().Dx() > brandImageTargetWidth {
-		img = imaging.Resize(img, brandImageTargetWidth, 0, imaging.Lanczos)
+	bounds := img.Bounds()
+	if bounds.Dx() > brandImageTargetWidth {
+		ratio := float64(bounds.Dy()) / float64(bounds.Dx())
+		targetHeight := int(math.Round(float64(brandImageTargetWidth) * ratio))
+		if targetHeight < 1 {
+			targetHeight = 1
+		}
+		dst := image.NewRGBA(image.Rect(0, 0, brandImageTargetWidth, targetHeight))
+		draw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, draw.Src, nil)
+		img = dst
 	}
 
 	var buf bytes.Buffer
