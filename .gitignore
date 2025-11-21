@@ -11,3 +11,9 @@ data/
 .DS_Store
 .idea/
 *.swp
+
+# MICR CLI artifacts
+micr_venv/
+.venv/
+__pycache__/
+ultimateMICR-SDK/
